@@ -1,7 +1,12 @@
 # MobileNetV4-pytorch
 An unofficial implementation of MobileNetV4 (MNv4) in Pytorch. <br />
 
-There are 5 types of MNv4 as indicated in the <a href="https://arxiv.org/abs/2404.10518">MobileNetV4 -- Universal Models for the Mobile Ecosystem</a>, e.g. MobileNetV4ConvSmall (MNv4-Conv-S), MobileNetV4ConvMedium (MNv4-Conv-M), MobileNetV4ConvLarge (MNv4-Conv-L), MobileNetV4HybridMedium (MNv4-Hybrid-M), MobileNetV4HybridLarge (MNv4-Hybrid-L)
+There are 5 types of MNv4 as indicated in the <a href="https://arxiv.org/abs/2404.10518">MobileNetV4 -- Universal Models for the Mobile Ecosystem</a>, e.g. 
+- MobileNetV4ConvSmall (MNv4-Conv-S)
+- MobileNetV4ConvMedium (MNv4-Conv-M)
+- MobileNetV4ConvLarge (MNv4-Conv-L)
+- MobileNetV4HybridMedium (MNv4-Hybrid-M)
+- MobileNetV4HybridLarge (MNv4-Hybrid-L)
 
 ## Table of Content
 - [How to initiate model](#mobilenetv4)
