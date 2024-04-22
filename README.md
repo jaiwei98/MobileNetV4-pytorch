@@ -9,8 +9,8 @@ There are 5 types of MNv4 as indicated in the <a href="https://arxiv.org/abs/240
 - MobileNetV4HybridLarge (MNv4-Hybrid-L)
 
 ## Table of Content
-- [How to initiate model](#mobilenetv4)
-- [Some TODO](#todo)
+- [How to init model](#mobilenetv4)
+- [TODO](#todo)
 - [Notes](#notes)
 
 ## MobileNetV4
@@ -38,7 +38,7 @@ for i in y:
 
 ## TODO
 - [ ] Support 'MobileNetV4HybridMedium' and 'MobileNetV4HybridLarge'
-- [ ] Release pretrained weight (welcome any contributors to submit PR)
+- [ ] Release pretrained weight (welcome any contributors to submit PR 😉)
 
 ## Notes
 Note that there are few parts which not excatly the same as implementation in tensorflow 

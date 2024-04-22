@@ -174,19 +174,3 @@ class MobileNetV4(nn.Module):
         x5 = nn.functional.adaptive_avg_pool2d(x5, 1 )
         return [x1, x2, x3, x4, x5]
        
-
-if __name__ == "__main__":
-    print("Checking ...")
-    model = MobileNetV4("MobileNetV4ConvSmall") # MobileNetV4ConvSmall MobileNetV4ConvMedium MobileNetV4ConvLarge
-    total_params = sum(p.numel() for p in model.parameters())
-    print(f"Number of trainable parameters: {total_params}")
-
-    x = torch.rand(1, 3, 224, 224)
-    y = model(x)
-    print("Check output ...")
-    for i in y:
-        print(i.shape)
-
-    from fvcore.nn import FlopCountAnalysis, flop_count_table 
-    flop_analyzer = FlopCountAnalysis(model, x)
-    print(flop_count_table(flop_analyzer))
