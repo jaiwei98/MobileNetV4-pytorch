@@ -21,7 +21,7 @@ import torch
 from mobilenet.mobilenetv4 import MobileNetV4
 
 # Support ['MobileNetV4ConvSmall', 'MobileNetV4ConvMedium', 'MobileNetV4ConvLarge']
-# Will be supported soon ['MobileNetV4HybridMedium', 'MobileNetV4HybridLarge']
+# Also supported ['MobileNetV4HybridMedium', 'MobileNetV4HybridLarge']
 model = MobileNetV4("MobileNetV4ConvSmall")
 
 # Check the trainable params
@@ -37,12 +37,12 @@ for i in y:
 ```
 
 ## TODO
-- [ ] Support 'MobileNetV4HybridMedium' and 'MobileNetV4HybridLarge'
+- [x] Support 'MobileNetV4HybridMedium' and 'MobileNetV4HybridLarge'
 - [ ] Release pretrained weight (welcome any contributors to submit PR 😉)
 
 ## Notes
 Note that there are few parts which not excatly the same as implementation in tensorflow 
-- The "fused_ib" block 
+- <del> The "fused_ib" block <del> 
 - The global average pooling layers at the end of model
 
 ## Credits
