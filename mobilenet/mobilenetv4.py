@@ -4,14 +4,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from mobilenet.model_config import MODEL_SPECS 
+from mobilenet.model_config import MODEL_SPECS
+
 
 def make_divisible(
         value: float,
         divisor: int,
         min_value: Optional[float] = None,
         round_down_protect: bool = True,
-    ) -> int:
+) -> int:
     """
     This function is copied from here 
     "https://github.com/tensorflow/models/blob/master/official/vision/modeling/layers/nn_layers.py"
@@ -36,6 +37,7 @@ def make_divisible(
         new_value += divisor
     return int(new_value)
 
+
 def conv_2d(inp, oup, kernel_size=3, stride=1, groups=1, bias=False, norm=True, act=True):
     conv = nn.Sequential()
     padding = (kernel_size - 1) // 2
@@ -45,6 +47,7 @@ def conv_2d(inp, oup, kernel_size=3, stride=1, groups=1, bias=False, norm=True, 
     if act:
         conv.add_module('Activation', nn.ReLU6())
     return conv
+
 
 class InvertedResidual(nn.Module):
     def __init__(self, inp, oup, stride, expand_ratio, act=False, squeeze_excitation=False):
@@ -56,7 +59,8 @@ class InvertedResidual(nn.Module):
         if expand_ratio != 1:
             self.block.add_module('exp_1x1', conv_2d(inp, hidden_dim, kernel_size=3, stride=stride))
         if squeeze_excitation:
-            self.block.add_module('conv_3x3', conv_2d(hidden_dim, hidden_dim, kernel_size=3, stride=stride, groups=hidden_dim))
+            self.block.add_module('conv_3x3',
+                                  conv_2d(hidden_dim, hidden_dim, kernel_size=3, stride=stride, groups=hidden_dim))
         self.block.add_module('red_1x1', conv_2d(hidden_dim, oup, kernel_size=1, stride=1, act=act))
         self.use_res_connect = self.stride == 1 and inp == oup
 
@@ -66,23 +70,24 @@ class InvertedResidual(nn.Module):
         else:
             return self.block(x)
 
+
 class UniversalInvertedBottleneckBlock(nn.Module):
-    def __init__(self, 
-            inp, 
-            oup, 
-            start_dw_kernel_size, 
-            middle_dw_kernel_size, 
-            middle_dw_downsample,
-            stride,
-            expand_ratio
-        ):
+    def __init__(self,
+                 inp,
+                 oup,
+                 start_dw_kernel_size,
+                 middle_dw_kernel_size,
+                 middle_dw_downsample,
+                 stride,
+                 expand_ratio
+                 ):
         """An inverted bottleneck block with optional depthwises.
         Referenced from here https://github.com/tensorflow/models/blob/master/official/vision/modeling/layers/nn_blocks.py
         """
         super().__init__()
         # Starting depthwise conv.
         self.start_dw_kernel_size = start_dw_kernel_size
-        if self.start_dw_kernel_size:            
+        if self.start_dw_kernel_size:
             stride_ = stride if not middle_dw_downsample else 1
             self._start_dw_ = conv_2d(inp, inp, kernel_size=start_dw_kernel_size, stride=stride_, groups=inp, act=False)
         # Expansion with 1x1 convs.
@@ -92,15 +97,16 @@ class UniversalInvertedBottleneckBlock(nn.Module):
         self.middle_dw_kernel_size = middle_dw_kernel_size
         if self.middle_dw_kernel_size:
             stride_ = stride if middle_dw_downsample else 1
-            self._middle_dw = conv_2d(expand_filters, expand_filters, kernel_size=middle_dw_kernel_size, stride=stride_, groups=expand_filters)
+            self._middle_dw = conv_2d(expand_filters, expand_filters, kernel_size=middle_dw_kernel_size, stride=stride_,
+                                      groups=expand_filters)
         # Projection with 1x1 convs.
         self._proj_conv = conv_2d(expand_filters, oup, kernel_size=1, stride=1, act=False)
-        
+
         # Ending depthwise conv.
         # this not used
         # _end_dw_kernel_size = 0
         # self._end_dw = conv_2d(oup, oup, kernel_size=_end_dw_kernel_size, stride=stride, groups=inp, act=False)
-        
+
     def forward(self, x):
         if self.start_dw_kernel_size:
             x = self._start_dw_(x)
@@ -114,8 +120,12 @@ class UniversalInvertedBottleneckBlock(nn.Module):
         # print("_proj_conv", x.shape)
         return x
 
+
 class MultiQueryAttentionLayerWithDownSampling(nn.Module):
-    def __init__(self, inp, num_heads, key_dim, value_dim, query_h_strides, query_w_strides, kv_strides, dw_kernel_size=3, dropout=0.0):
+    def __init__(self, inp, num_heads, key_dim,
+                 value_dim, query_h_strides,
+                 query_w_strides, kv_strides,
+                 dw_kernel_size=3, dropout=0.0):
         """Multi Query Attention with spatial downsampling.
         Referenced from here https://github.com/tensorflow/models/blob/master/official/vision/modeling/layers/nn_blocks.py
 
@@ -138,55 +148,73 @@ class MultiQueryAttentionLayerWithDownSampling(nn.Module):
         self.dw_kernel_size = dw_kernel_size
         self.dropout = dropout
 
-        self.head_dim = key_dim // num_heads
+        # self.head_dim = key_dim // num_heads
 
         if self.query_h_strides > 1 or self.query_w_strides > 1:
             self._query_downsampling_norm = nn.BatchNorm2d(inp)
-        self._query_proj = conv_2d(inp, num_heads*key_dim, 1, 1, norm=False, act=False)
-        
+        self._query_proj = conv_2d(inp, num_heads * key_dim, 1, 1, norm=False, act=False)
+
         if self.kv_strides > 1:
             self._key_dw_conv = conv_2d(inp, inp, dw_kernel_size, kv_strides, groups=inp, norm=True, act=False)
             self._value_dw_conv = conv_2d(inp, inp, dw_kernel_size, kv_strides, groups=inp, norm=True, act=False)
         self._key_proj = conv_2d(inp, key_dim, 1, 1, norm=False, act=False)
         self._value_proj = conv_2d(inp, key_dim, 1, 1, norm=False, act=False)
 
-        self._output_proj = conv_2d(num_heads*key_dim, inp, 1, 1, norm=False, act=False)
+        self._output_proj = conv_2d(num_heads * key_dim, inp, 1, 1, norm=False, act=False)
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
-        batch_size, seq_length, _, _ = x.size()
+        batch_size, inp, h, w = x.size()
         if self.query_h_strides > 1 or self.query_w_strides > 1:
             q = F.avg_pool2d(self.query_h_stride, self.query_w_stride)
             q = self._query_downsampling_norm(q)
             q = self._query_proj(q)
         else:
             q = self._query_proj(x)
-        px = q.size(2)
-        q = q.view(batch_size, self.num_heads, -1, self.key_dim) # [batch_size, num_heads, seq_length, key_dim]
+        qx, qy = q.size(3), q.size(2)
+        q = q.view(batch_size, self.num_heads, self.key_dim, qx * qy)  # [batch_size, num_heads, key_dim, qx * qy]
+        q = q.transpose(2, 3).contiguous()  # [batch_size, num_heads, qx * qy, key_dim]
 
         if self.kv_strides > 1:
             k = self._key_dw_conv(x)
             k = self._key_proj(k)
             v = self._value_dw_conv(x)
-            v = self._value_proj(v)          
+            v = self._value_proj(v)
         else:
             k = self._key_proj(x)
             v = self._value_proj(x)
-        k = k.view(batch_size, self.key_dim, -1) # [batch_size, key_dim, seq_length]
-        v = v.view(batch_size, -1, self.key_dim) # [batch_size, seq_length, key_dim]
 
-        # calculate attn score
-        attn_score = torch.matmul(q, k) / (self.head_dim ** 0.5)
-        attn_score = self.dropout(attn_score)
+        kx, ky = k.size(3), k.size(2)
+        k = k.view(batch_size, self.key_dim, kx * ky)  # [batch_size, key_dim, kx * ky]
+        k = k.transpose(2, 1)  # [batch_size, kx * ky, key_dim]
+        k = k.view(batch_size, kx * ky, 1, self.key_dim)  # [batch_size, kx * ky, 1, key_dim]
+        k = k.transpose(1, 2)  # [batch_size, 1, kx * ky, key_dim]
+
+        vx, vy = v.size(3), v.size(2)
+        assert kx == vx and ky == vy
+
+        v = v.view(batch_size, self.key_dim, vx * vy)  # [batch_size, key_dim, vx * vy]
+        v = v.transpose(2, 1)  # [batch_size, vx * vy, key_dim]
+        v = v.view(batch_size, vx * vy, 1, self.key_dim)  # [batch_size, vx * vy, 1, key_dim]
+        v = v.transpose(1, 2)  # [batch_size, 1, vx * vy, key_dim]
+
+        # calculate attn score, [batch_size, num_heads, qx * qy, kx * ky]
+        attn_score = (q @ k.transpose(-2, -1)) / (self.key_dim ** 0.5)
         attn_score = F.softmax(attn_score, dim=-1)
+        attn_score = self.dropout(attn_score)  # [batch_size, num_heads, qx * qy, kx * ky]
 
-        context = torch.matmul(attn_score, v)
-        context = context.view(batch_size, self.num_heads * self.key_dim, px, px)
-        output = self._output_proj(context)
+        context = (attn_score @ v).transpose(1, 2)  # [batch_size, qx * qy, num_heads, key_dim]
+
+        # [batch_size, qx, qy, num_heads * key_dim]
+        context = context.view(batch_size, qx, qy, self.num_heads * self.key_dim)
+        output = self._output_proj(context)  # [batch_size, qx, qy, inp]
+        if self.query_h_strides > 1 or self.query_w_strides > 1:
+            output = F.interpolate(output, size=(h, w), mode='bilinear', align_corners=True)
         return output
 
+
 class MNV4LayerScale(nn.Module):
-    def __init__(self, init_value):
+    def __init__(self, embedding_dim, init_value):
         """LayerScale as introduced in CaiT: https://arxiv.org/abs/2103.17239
         Referenced from here https://github.com/tensorflow/models/blob/master/official/vision/modeling/layers/nn_blocks.py
         
@@ -196,26 +224,26 @@ class MNV4LayerScale(nn.Module):
             init_value (float): value to initialize the diagonal matrix of LayerScale.
         """
         super().__init__()
-        self.init_value = init_value
-    
+        self._gamma = torch.nn.Parameter(torch.ones(embedding_dim) * init_value)
+
     def forward(self, x):
-        gamma = self.init_value * torch.ones(x.size(-1), dtype=x.dtype, device=x.device)
-        return x * gamma
+        return x * self._gamma
+
 
 class MultiHeadSelfAttentionBlock(nn.Module):
     def __init__(
-            self, 
+            self,
             inp,
-            num_heads, 
-            key_dim,  
-            value_dim, 
-            query_h_strides, 
-            query_w_strides, 
+            num_heads,
+            key_dim,
+            value_dim,
+            query_h_strides,
+            query_w_strides,
             kv_strides,
             use_layer_scale,
-            use_multi_query, 
-            use_residual = True
-        ):
+            use_multi_query,
+            use_residual=True
+    ):
         super().__init__()
         self.query_h_strides = query_h_strides
         self.query_w_strides = query_w_strides
@@ -231,11 +259,11 @@ class MultiHeadSelfAttentionBlock(nn.Module):
             )
         else:
             self.multi_head_attention = nn.MultiheadAttention(inp, num_heads, kdim=key_dim)
-        
+
         if self.use_layer_scale:
             self.layer_scale_init_value = 1e-5
-            self.layer_scale = MNV4LayerScale(self.layer_scale_init_value) 
-    
+            self.layer_scale = MNV4LayerScale(inp, self.layer_scale_init_value)
+
     def forward(self, x):
         # Not using CPE, skipped
         # input norm
@@ -254,6 +282,7 @@ class MultiHeadSelfAttentionBlock(nn.Module):
             x = x + shortcut
         return x
 
+
 def build_blocks(layer_spec):
     if not layer_spec.get('block_name'):
         return nn.Sequential()
@@ -265,14 +294,15 @@ def build_blocks(layer_spec):
             args = dict(zip(schema_, layer_spec['block_specs'][i]))
             layers.add_module(f"convbn_{i}", conv_2d(**args))
     elif block_names == "uib":
-        schema_ =  ['inp', 'oup', 'start_dw_kernel_size', 'middle_dw_kernel_size', 'middle_dw_downsample', 'stride', 'expand_ratio', 'msha']
+        schema_ = ['inp', 'oup', 'start_dw_kernel_size', 'middle_dw_kernel_size', 'middle_dw_downsample', 'stride',
+                   'expand_ratio', 'msha']
         for i in range(layer_spec['num_blocks']):
             args = dict(zip(schema_, layer_spec['block_specs'][i]))
             msha = args.pop("msha") if "msha" in args else 0
             layers.add_module(f"uib_{i}", UniversalInvertedBottleneckBlock(**args))
             if msha:
                 msha_schema_ = [
-                    "inp", "num_heads", "key_dim", "value_dim", "query_h_strides", "query_w_strides", "kv_strides", 
+                    "inp", "num_heads", "key_dim", "value_dim", "query_h_strides", "query_w_strides", "kv_strides",
                     "use_layer_scale", "use_multi_query", "use_residual"
                 ]
                 args = dict(zip(msha_schema_, [args['oup']] + (msha)))
@@ -300,7 +330,7 @@ class MobileNetV4(nn.Module):
         assert model in MODEL_SPECS.keys()
         self.model = model
         self.spec = MODEL_SPECS[self.model]
-       
+
         # conv0
         self.conv0 = build_blocks(self.spec['conv0'])
         # layer1
@@ -312,8 +342,8 @@ class MobileNetV4(nn.Module):
         # layer4
         self.layer4 = build_blocks(self.spec['layer4'])
         # layer5   
-        self.layer5 = build_blocks(self.spec['layer5'])       
-               
+        self.layer5 = build_blocks(self.spec['layer5'])
+
     def forward(self, x):
         x0 = self.conv0(x)
         x1 = self.layer1(x0)
@@ -321,6 +351,5 @@ class MobileNetV4(nn.Module):
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
         x5 = self.layer5(x4)
-        x5 = nn.functional.adaptive_avg_pool2d(x5, 1 )
+        x5 = nn.functional.adaptive_avg_pool2d(x5, 1)
         return [x1, x2, x3, x4, x5]
-       
