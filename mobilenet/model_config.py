@@ -1,4 +1,3 @@
-
 MNV4ConvSmall_BLOCK_SPECS = {
     "conv0": {
         "block_name": "convbn",
@@ -39,14 +38,14 @@ MNV4ConvSmall_BLOCK_SPECS = {
         "block_name": "uib",
         "num_blocks": 6,
         "block_specs": [
-            [96,  128, 3, 3, True, 2, 6],
+            [96, 128, 3, 3, True, 2, 6],
             [128, 128, 5, 5, True, 1, 4],
             [128, 128, 0, 5, True, 1, 4],
             [128, 128, 0, 5, True, 1, 3],
             [128, 128, 0, 3, True, 1, 4],
             [128, 128, 0, 3, True, 1, 4],
         ]
-    },  
+    },
     "layer5": {
         "block_name": "convbn",
         "num_blocks": 2,
@@ -84,7 +83,7 @@ MNV4ConvMedium_BLOCK_SPECS = {
         "block_name": "uib",
         "num_blocks": 8,
         "block_specs": [
-            [80,  160, 3, 5, True, 2, 6],
+            [80, 160, 3, 5, True, 2, 6],
             [160, 160, 3, 3, True, 1, 4],
             [160, 160, 3, 3, True, 1, 4],
             [160, 160, 3, 5, True, 1, 4],
@@ -110,7 +109,7 @@ MNV4ConvMedium_BLOCK_SPECS = {
             [256, 256, 0, 0, True, 1, 4],
             [256, 256, 5, 0, True, 1, 2]
         ]
-    },  
+    },
     "layer5": {
         "block_name": "convbn",
         "num_blocks": 2,
@@ -148,7 +147,7 @@ MNV4ConvLarge_BLOCK_SPECS = {
         "block_name": "uib",
         "num_blocks": 11,
         "block_specs": [
-            [96,  192, 3, 5, True, 2, 4],
+            [96, 192, 3, 5, True, 2, 4],
             [192, 192, 3, 3, True, 1, 4],
             [192, 192, 3, 3, True, 1, 4],
             [192, 192, 3, 3, True, 1, 4],
@@ -179,7 +178,7 @@ MNV4ConvLarge_BLOCK_SPECS = {
             [512, 512, 5, 0, True, 1, 4],
             [512, 512, 5, 0, True, 1, 4]
         ]
-    },  
+    },
     "layer5": {
         "block_name": "convbn",
         "num_blocks": 2,
@@ -190,20 +189,22 @@ MNV4ConvLarge_BLOCK_SPECS = {
     }
 }
 
+
 def mhsa(num_heads, key_dim, value_dim, px):
     if px == 24:
         kv_strides = 2
     elif px == 12:
         kv_strides = 1
-    query_h_strides = 1 
-    query_w_strides = 1 
-    use_layer_scale = True 
+    query_h_strides = 1
+    query_w_strides = 1
+    use_layer_scale = True
     use_multi_query = True
     use_residual = True
     return [
-        num_heads, key_dim, value_dim, query_h_strides, query_w_strides, kv_strides, 
+        num_heads, key_dim, value_dim, query_h_strides, query_w_strides, kv_strides,
         use_layer_scale, use_multi_query, use_residual
     ]
+
 
 MNV4HybridConvMedium_BLOCK_SPECS = {
     "conv0": {
@@ -232,7 +233,7 @@ MNV4HybridConvMedium_BLOCK_SPECS = {
         "block_name": "uib",
         "num_blocks": 8,
         "block_specs": [
-            [80,  160, 3, 5, True, 2, 6],
+            [80, 160, 3, 5, True, 2, 6],
             [160, 160, 0, 0, True, 1, 2],
             [160, 160, 3, 3, True, 1, 4],
             [160, 160, 3, 5, True, 1, 4, mhsa(4, 64, 64, 24)],
@@ -259,7 +260,7 @@ MNV4HybridConvMedium_BLOCK_SPECS = {
             [256, 256, 5, 0, True, 1, 4, mhsa(4, 64, 64, 12)],
             [256, 256, 5, 0, True, 1, 4]
         ]
-    },  
+    },
     "layer5": {
         "block_name": "convbn",
         "num_blocks": 2,
@@ -297,7 +298,7 @@ MNV4HybridConvLarge_BLOCK_SPECS = {
         "block_name": "uib",
         "num_blocks": 11,
         "block_specs": [
-            [96,  192, 3, 5, True, 2, 4],
+            [96, 192, 3, 5, True, 2, 4],
             [192, 192, 3, 3, True, 1, 4],
             [192, 192, 3, 3, True, 1, 4],
             [192, 192, 3, 3, True, 1, 4],
@@ -329,7 +330,7 @@ MNV4HybridConvLarge_BLOCK_SPECS = {
             [512, 512, 5, 0, True, 1, 4, mhsa(8, 64, 64, 12)],
             [512, 512, 5, 0, True, 1, 4]
         ]
-    },  
+    },
     "layer5": {
         "block_name": "convbn",
         "num_blocks": 2,
