@@ -203,10 +203,9 @@ class MultiQueryAttentionLayerWithDownSampling(nn.Module):
         attn_score = F.softmax(attn_score, dim=-1)
         attn_score = self.dropout(attn_score)  # [batch_size, num_heads, qx * qy, kx * ky]
 
-        context = (attn_score @ v).transpose(1, 2)  # [batch_size, qx * qy, num_heads, key_dim]
-
-        # [batch_size, qx, qy, num_heads * key_dim]
-        context = context.view(batch_size, qx, qy, self.num_heads * self.key_dim)
+        context = (attn_score @ v).transpose(2, 3)  # [batch_size, num_heads, key_dim, qx * qy]
+        # [batch_size, num_heads * key_dim, qy, qx]
+        context = context.reshape(batch_size, self.num_heads * self.key_dim, qy, qx)
         output = self._output_proj(context)  # [batch_size, qx, qy, inp]
         if self.query_h_strides > 1 or self.query_w_strides > 1:
             output = F.interpolate(output, size=(h, w), mode='bilinear', align_corners=True)
@@ -224,7 +223,7 @@ class MNV4LayerScale(nn.Module):
             init_value (float): value to initialize the diagonal matrix of LayerScale.
         """
         super().__init__()
-        self._gamma = torch.nn.Parameter(torch.ones(embedding_dim) * init_value)
+        self._gamma = torch.nn.Parameter(torch.ones(embedding_dim, 1, 1) * init_value)
 
     def forward(self, x):
         return x * self._gamma
@@ -286,28 +285,28 @@ class MultiHeadSelfAttentionBlock(nn.Module):
 def build_blocks(layer_spec):
     if not layer_spec.get('block_name'):
         return nn.Sequential()
-    block_names = layer_spec['block_name']
+    block_name = layer_spec['block_name']
     layers = nn.Sequential()
-    if block_names == "convbn":
+    if block_name == "convbn":
         schema_ = ['inp', 'oup', 'kernel_size', 'stride']
         for i in range(layer_spec['num_blocks']):
             args = dict(zip(schema_, layer_spec['block_specs'][i]))
             layers.add_module(f"convbn_{i}", conv_2d(**args))
-    elif block_names == "uib":
-        schema_ = ['inp', 'oup', 'start_dw_kernel_size', 'middle_dw_kernel_size', 'middle_dw_downsample', 'stride',
-                   'expand_ratio', 'msha']
+    elif block_name == "uib":
+        schema_ = ['inp', 'oup', 'start_dw_kernel_size', 'middle_dw_kernel_size',
+                   'middle_dw_downsample', 'stride', 'expand_ratio', 'msha']
         for i in range(layer_spec['num_blocks']):
             args = dict(zip(schema_, layer_spec['block_specs'][i]))
-            msha = args.pop("msha") if "msha" in args else 0
+            msha = args.pop("msha") if "msha" in args else None
             layers.add_module(f"uib_{i}", UniversalInvertedBottleneckBlock(**args))
-            if msha:
+            if msha is not None:
                 msha_schema_ = [
                     "inp", "num_heads", "key_dim", "value_dim", "query_h_strides", "query_w_strides", "kv_strides",
                     "use_layer_scale", "use_multi_query", "use_residual"
                 ]
-                args = dict(zip(msha_schema_, [args['oup']] + (msha)))
+                args = dict(zip(msha_schema_, [args['oup']] + msha))
                 layers.add_module(f"msha_{i}", MultiHeadSelfAttentionBlock(**args))
-    elif block_names == "fused_ib":
+    elif block_name == "fused_ib":
         schema_ = ['inp', 'oup', 'stride', 'expand_ratio', 'act']
         for i in range(layer_spec['num_blocks']):
             args = dict(zip(schema_, layer_spec['block_specs'][i]))
@@ -351,5 +350,15 @@ class MobileNetV4(nn.Module):
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
         x5 = self.layer5(x4)
-        x5 = nn.functional.adaptive_avg_pool2d(x5, 1)
+        x5 = F.adaptive_avg_pool2d(x5, 1)
         return [x1, x2, x3, x4, x5]
+
+
+if __name__ == "__main__":
+    import torchinfo
+
+    model = MobileNetV4("MobileNetV4HybridMedium")
+    torchinfo.summary(model, (1, 3, 224, 224))
+    model = model.cuda()
+    input = torch.randn(1, 3, 224, 224).cuda()
+    output = model(input)
