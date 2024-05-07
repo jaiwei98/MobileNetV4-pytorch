@@ -172,8 +172,8 @@ class MultiQueryAttentionLayerWithDownSampling(nn.Module):
         else:
             k = self._key_proj(x)
             v = self._value_proj(x)
-        k = k.view(batch_size, self.key_dim, -1) # [batch_size, key_dim, seq_length]
-        v = v.view(batch_size, -1, self.key_dim) # [batch_size, seq_length, key_dim]
+        k = k.view(batch_size, 1, self.key_dim, -1) # [batch_size, 1, key_dim, seq_length]
+        v = v.view(batch_size, 1, -1, self.key_dim) # [batch_size, 1, seq_length, key_dim]
 
         # calculate attn score
         attn_score = torch.matmul(q, k) / (self.head_dim ** 0.5)
@@ -186,7 +186,7 @@ class MultiQueryAttentionLayerWithDownSampling(nn.Module):
         return output
 
 class MNV4LayerScale(nn.Module):
-    def __init__(self, init_value):
+    def __init__(self, inp, init_value):
         """LayerScale as introduced in CaiT: https://arxiv.org/abs/2103.17239
         Referenced from here https://github.com/tensorflow/models/blob/master/official/vision/modeling/layers/nn_blocks.py
         
@@ -197,10 +197,10 @@ class MNV4LayerScale(nn.Module):
         """
         super().__init__()
         self.init_value = init_value
+        self._gamma = nn.Parameter(self.init_value * torch.ones(inp, 1, 1))
     
     def forward(self, x):
-        gamma = self.init_value * torch.ones(x.size(-1), dtype=x.dtype, device=x.device)
-        return x * gamma
+        return x * self._gamma
 
 class MultiHeadSelfAttentionBlock(nn.Module):
     def __init__(
@@ -234,7 +234,7 @@ class MultiHeadSelfAttentionBlock(nn.Module):
         
         if self.use_layer_scale:
             self.layer_scale_init_value = 1e-5
-            self.layer_scale = MNV4LayerScale(self.layer_scale_init_value) 
+            self.layer_scale = MNV4LayerScale(inp, self.layer_scale_init_value) 
     
     def forward(self, x):
         # Not using CPE, skipped
