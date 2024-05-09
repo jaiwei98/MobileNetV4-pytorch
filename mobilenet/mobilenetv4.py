@@ -38,7 +38,9 @@ def make_divisible(
     return int(new_value)
 
 
-def conv_2d(inp, oup, kernel_size=3, stride=1, groups=1, bias=False, norm=True, act=True):
+def conv_2d(inp: int, oup: int, kernel_size: int = 3,
+            stride: int = 1, groups: int = 1, bias: bool = False,
+            norm: bool = True, act: bool = True) -> nn.Sequential:
     conv = nn.Sequential()
     padding = (kernel_size - 1) // 2
     conv.add_module('conv', nn.Conv2d(inp, oup, kernel_size, stride, padding, bias=bias, groups=groups))
@@ -50,7 +52,8 @@ def conv_2d(inp, oup, kernel_size=3, stride=1, groups=1, bias=False, norm=True, 
 
 
 class InvertedResidual(nn.Module):
-    def __init__(self, inp, oup, stride, expand_ratio, act=False, squeeze_excitation=False):
+    def __init__(self, inp: int, oup: int, stride: int, expand_ratio: int,
+                 act: bool = False, squeeze_excitation: bool = False):
         super(InvertedResidual, self).__init__()
         self.stride = stride
         assert stride in [1, 2]
@@ -64,7 +67,7 @@ class InvertedResidual(nn.Module):
         self.block.add_module('red_1x1', conv_2d(hidden_dim, oup, kernel_size=1, stride=1, act=act))
         self.use_res_connect = self.stride == 1 and inp == oup
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.use_res_connect:
             return x + self.block(x)
         else:
@@ -73,13 +76,13 @@ class InvertedResidual(nn.Module):
 
 class UniversalInvertedBottleneckBlock(nn.Module):
     def __init__(self,
-                 inp,
-                 oup,
-                 start_dw_kernel_size,
-                 middle_dw_kernel_size,
-                 middle_dw_downsample,
-                 stride,
-                 expand_ratio
+                 inp: int,
+                 oup: int,
+                 start_dw_kernel_size: int,
+                 middle_dw_kernel_size: int,
+                 middle_dw_downsample: int,
+                 stride: int,
+                 expand_ratio: int,
                  ):
         """An inverted bottleneck block with optional depthwises.
         Referenced from here https://github.com/tensorflow/models/blob/master/official/vision/modeling/layers/nn_blocks.py
@@ -107,7 +110,7 @@ class UniversalInvertedBottleneckBlock(nn.Module):
         # _end_dw_kernel_size = 0
         # self._end_dw = conv_2d(oup, oup, kernel_size=_end_dw_kernel_size, stride=stride, groups=inp, act=False)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         if self.start_dw_kernel_size:
             x = self._start_dw_(x)
             # print("_start_dw_", x.shape)
@@ -122,10 +125,10 @@ class UniversalInvertedBottleneckBlock(nn.Module):
 
 
 class MultiQueryAttentionLayerWithDownSampling(nn.Module):
-    def __init__(self, inp, num_heads, key_dim,
-                 value_dim, query_h_strides,
-                 query_w_strides, kv_strides,
-                 dw_kernel_size=3, dropout=0.0):
+    def __init__(self, inp: int, num_heads: int, key_dim: int,
+                 value_dim: int, query_h_strides: int,
+                 query_w_strides: int, kv_strides: int,
+                 dw_kernel_size: int = 3, dropout: float = 0.0):
         """Multi Query Attention with spatial downsampling.
         Referenced from here https://github.com/tensorflow/models/blob/master/official/vision/modeling/layers/nn_blocks.py
 
@@ -163,7 +166,7 @@ class MultiQueryAttentionLayerWithDownSampling(nn.Module):
         self._output_proj = conv_2d(num_heads * key_dim, inp, 1, 1, norm=False, act=False)
         self.dropout = nn.Dropout(p=dropout)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         batch_size, inp, h, w = x.size()
         if self.query_h_strides > 1 or self.query_w_strides > 1:
             q = F.avg_pool2d(self.query_h_stride, self.query_w_stride)
@@ -185,21 +188,17 @@ class MultiQueryAttentionLayerWithDownSampling(nn.Module):
             v = self._value_proj(x)
 
         kx, ky = k.size(3), k.size(2)
-        k = k.view(batch_size, self.key_dim, kx * ky)  # [batch_size, key_dim, kx * ky]
-        k = k.transpose(2, 1)  # [batch_size, kx * ky, key_dim]
-        k = k.view(batch_size, kx * ky, 1, self.key_dim)  # [batch_size, kx * ky, 1, key_dim]
-        k = k.transpose(1, 2)  # [batch_size, 1, kx * ky, key_dim]
+        k = k.view(batch_size, 1, self.key_dim, kx * ky)  # [batch_size, 1, key_dim, kx * ky]
+        # k = k.transpose(2, 3)  # [batch_size, 1, kx * ky, key_dim]
 
         vx, vy = v.size(3), v.size(2)
         assert kx == vx and ky == vy
 
-        v = v.view(batch_size, self.key_dim, vx * vy)  # [batch_size, key_dim, vx * vy]
-        v = v.transpose(2, 1)  # [batch_size, vx * vy, key_dim]
-        v = v.view(batch_size, vx * vy, 1, self.key_dim)  # [batch_size, vx * vy, 1, key_dim]
-        v = v.transpose(1, 2)  # [batch_size, 1, vx * vy, key_dim]
+        v = v.view(batch_size, 1, self.key_dim, vx * vy)  # [batch_size, 1, key_dim, vx * vy]
+        v = v.transpose(2, 3)  # [batch_size, 1, vx * vy, key_dim]
 
         # calculate attn score, [batch_size, num_heads, qx * qy, kx * ky]
-        attn_score = (q @ k.transpose(-2, -1)) / (self.key_dim ** 0.5)
+        attn_score = (q @ k) / (self.key_dim ** 0.5)
         attn_score = F.softmax(attn_score, dim=-1)
         attn_score = self.dropout(attn_score)  # [batch_size, num_heads, qx * qy, kx * ky]
 
@@ -213,7 +212,7 @@ class MultiQueryAttentionLayerWithDownSampling(nn.Module):
 
 
 class MNV4LayerScale(nn.Module):
-    def __init__(self, embedding_dim, init_value):
+    def __init__(self, embedding_dim: int, init_value: float):
         """LayerScale as introduced in CaiT: https://arxiv.org/abs/2103.17239
         Referenced from here https://github.com/tensorflow/models/blob/master/official/vision/modeling/layers/nn_blocks.py
         
@@ -225,23 +224,23 @@ class MNV4LayerScale(nn.Module):
         super().__init__()
         self._gamma = torch.nn.Parameter(torch.ones(embedding_dim, 1, 1) * init_value)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x * self._gamma
 
 
 class MultiHeadSelfAttentionBlock(nn.Module):
     def __init__(
             self,
-            inp,
-            num_heads,
-            key_dim,
-            value_dim,
-            query_h_strides,
-            query_w_strides,
-            kv_strides,
-            use_layer_scale,
-            use_multi_query,
-            use_residual=True
+            inp: int,
+            num_heads: int,
+            key_dim: int,
+            value_dim: int,
+            query_h_strides: int,
+            query_w_strides: int,
+            kv_strides: int,
+            use_layer_scale: bool,
+            use_multi_query: bool,
+            use_residual: bool = True
     ):
         super().__init__()
         self.query_h_strides = query_h_strides
@@ -263,7 +262,7 @@ class MultiHeadSelfAttentionBlock(nn.Module):
             self.layer_scale_init_value = 1e-5
             self.layer_scale = MNV4LayerScale(inp, self.layer_scale_init_value)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Not using CPE, skipped
         # input norm
         shortcut = x
@@ -317,7 +316,7 @@ def build_blocks(layer_spec):
 
 
 class MobileNetV4(nn.Module):
-    def __init__(self, model):
+    def __init__(self, model: str, in_channels: int = 3, in_stride: int = 2):
         # MobileNetV4ConvSmall  MobileNetV4ConvMedium  MobileNetV4ConvLarge
         # MobileNetV4HybridMedium  MobileNetV4HybridLarge
         """Params to initiate MobilenNetV4
@@ -329,6 +328,9 @@ class MobileNetV4(nn.Module):
         assert model in MODEL_SPECS.keys()
         self.model = model
         self.spec = MODEL_SPECS[self.model]
+        assert self.spec["conv0"]["block_name"] == "convbn"
+        self.spec['conv0']["block_specs"][0][0] = in_channels
+        self.spec['conv0']["block_specs"][0][3] = in_stride
 
         # conv0
         self.conv0 = build_blocks(self.spec['conv0'])
@@ -343,7 +345,7 @@ class MobileNetV4(nn.Module):
         # layer5   
         self.layer5 = build_blocks(self.spec['layer5'])
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         x0 = self.conv0(x)
         x1 = self.layer1(x0)
         x2 = self.layer2(x1)
@@ -357,8 +359,12 @@ class MobileNetV4(nn.Module):
 if __name__ == "__main__":
     import torchinfo
 
-    model = MobileNetV4("MobileNetV4HybridMedium")
-    torchinfo.summary(model, (1, 3, 224, 224))
+    in_channels = 1
+    in_stride = 2
+    height = width = 480
+
+    model = MobileNetV4("MobileNetV4HybridLarge", in_channels=in_channels, in_stride=in_stride)
+    torchinfo.summary(model, (1, in_channels, height, width))
     model = model.cuda()
-    input = torch.randn(1, 3, 224, 224).cuda()
+    input = torch.randn(1, in_channels, height, width).cuda()
     output = model(input)
