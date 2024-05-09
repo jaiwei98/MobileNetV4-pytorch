@@ -265,18 +265,18 @@ def build_blocks(layer_spec):
             args = dict(zip(schema_, layer_spec['block_specs'][i]))
             layers.add_module(f"convbn_{i}", conv_2d(**args))
     elif block_names == "uib":
-        schema_ =  ['inp', 'oup', 'start_dw_kernel_size', 'middle_dw_kernel_size', 'middle_dw_downsample', 'stride', 'expand_ratio', 'msha']
+        schema_ =  ['inp', 'oup', 'start_dw_kernel_size', 'middle_dw_kernel_size', 'middle_dw_downsample', 'stride', 'expand_ratio', 'mhsa']
         for i in range(layer_spec['num_blocks']):
             args = dict(zip(schema_, layer_spec['block_specs'][i]))
-            msha = args.pop("msha") if "msha" in args else 0
+            mhsa = args.pop("mhsa") if "mhsa" in args else 0
             layers.add_module(f"uib_{i}", UniversalInvertedBottleneckBlock(**args))
-            if msha:
-                msha_schema_ = [
+            if mhsa:
+                mhsa_schema_ = [
                     "inp", "num_heads", "key_dim", "value_dim", "query_h_strides", "query_w_strides", "kv_strides", 
                     "use_layer_scale", "use_multi_query", "use_residual"
                 ]
-                args = dict(zip(msha_schema_, [args['oup']] + (msha)))
-                layers.add_module(f"msha_{i}", MultiHeadSelfAttentionBlock(**args))
+                args = dict(zip(mhsa_schema_, [args['oup']] + (mhsa)))
+                layers.add_module(f"mhsa_{i}", MultiHeadSelfAttentionBlock(**args))
     elif block_names == "fused_ib":
         schema_ = ['inp', 'oup', 'stride', 'expand_ratio', 'act']
         for i in range(layer_spec['num_blocks']):
