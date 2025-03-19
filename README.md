@@ -10,6 +10,7 @@ There are 5 types of MNv4 as indicated in the <a href="https://arxiv.org/abs/240
 
 ## Table of Content
 - [How to init model](#mobilenetv4)
+- [Sample Inference](#inference)
 - [TODO](#todo)
 - [Notes](#notes)
 
@@ -36,6 +37,20 @@ for i in y:
     print(i.shape)
 ```
 
+## Inference
+This section showed how to perform a simple inference, currently provided 3 weights in https://huggingface.co/jaiwei98/MobileNetV4
+
+```bash
+python sample_inference.py --model-name MobileNetV4ConvSmall --weight-path MobileNetV4/MobileNetV4ConvSmall.pth --image-path asset\sample_image.jpg
+# Output: tensor([0])
+
+# python sample_inference.py --model-name MobileNetV4ConvMedium --weight-path MobileNetV4/MobileNetV4ConvMedium.pth --image-path asset\sample_image.jpg
+# Output: tensor([0])
+
+# python sample_inference.py --model-name MobileNetV4ConvLarge --weight-path MobileNetV4/MobileNetV4ConvLarge.pth --image-path asset\sample_image.jpg
+# Output: tensor([0])
+```
+
 ## TODO
 - [x] Support 'MobileNetV4HybridMedium' and 'MobileNetV4HybridLarge'
 - [ ] Release pretrained weight (welcome any contributors to submit PR 😉)
@@ -43,7 +58,7 @@ for i in y:
 ## Notes
 Note that there are few parts which not excatly the same as implementation in tensorflow 
 - <del> The "fused_ib" block <del> 
-- The global average pooling layers at the end of model
+- <del> The global average pooling layers at the end of model <del> 
 
 ## Credits
 Some function and code are adapted and referenced from official repo <a href="https://github.com/tensorflow/models/blob/master/official/vision/modeling/backbones/mobilenet.py">tensorflow/models</a>.
